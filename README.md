@@ -389,6 +389,12 @@ Recommended metrics:
 
 Because the task is early-warning prediction, recall and precision around the positive class usually matter more than raw accuracy.
 
+## Practical Implementation
+
+A planned practical extension of this project is a **live predictive monitoring mode** in which the telemetry logger and trained prediction pipeline run locally on the user’s machine in near real time. In that setup, incoming telemetry samples would be processed continuously, transformed into the same feature space used during training, and passed through the fitted model so the system can estimate whether the machine is entering a rising thermal-risk state before critical heat levels are reached.
+
+If the model detects elevated near-future thermal risk, the local application can issue a simple warning through the terminal or a lightweight on-screen alert box. The purpose of the warning is not to alarm the user, but to encourage practical action such as reducing unnecessary workload, reorganising tabs, closing heavy background processes, or spreading tasks more efficiently so that sustained thermal stress is reduced and long-term device strain may be limited.
+
 ## Important cautions
 
 ### Data leakage
@@ -407,7 +413,3 @@ Some current scripts/notebook cells may still contain absolute local paths. Befo
 ## License
 
 This repository uses the MIT License.
-
-## Contact / usage note
-
-This repo is currently a live project workspace. Expect frequent iteration while the preprocessing, labelling, and modelling stages are still being refined.
