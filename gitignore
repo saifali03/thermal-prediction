@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Environments
+.venv/
+venv/
+env/
+ENV/
+.conda/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Build / packaging
+build/
+dist/
+*.egg-info/
+
+# Model and temp artifacts
+artifacts/*.pkl
+artifacts/*.joblib
+artifacts/*.npy
+artifacts/*.npz
+artifacts/*.onnx
+artifacts/*.h5
+artifacts/*.keras
+artifacts/*.pt
+artifacts/*.pth
+
+# Optional: ignore generated plots if desired
+# artifacts/*.png
+# artifacts/*.svg
+
+# Keep raw/interim data tracked because this repo intentionally stores them publicly
+# data/raw/
+# data/interim/

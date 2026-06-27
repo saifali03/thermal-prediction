@@ -1,0 +1,413 @@
+# CPU Thermal-Prediction
+
+Apple Silicon thermal distress prediction project for session-based telemetry collection, preprocessing, feature engineering, exploratory analysis, and upcoming classification experiments.
+
+This repository is currently a **working team repo**. It is public, but the main goal right now is to let teammates pull the code, understand the pipeline, reproduce the setup, inspect the raw/interim data, and continue into imbalance handling and model training.
+
+## Project goal
+
+The project aims to predict **imminent thermal distress** on an Apple Silicon machine from time-series telemetry collected during different workload sessions. The current pipeline collects telemetry on macOS, stores it in structured raw-session files, cleans and merges sessions, handles gaps and missingness, constructs a forward-looking binary target, performs exploratory analysis, and engineers temporal features for machine learning.
+
+In practical terms, the workflow is:
+
+1.  Collect telemetry on an Apple Silicon Mac.
+2.  Store each logging run as a session CSV plus session metadata.
+3.  Merge sessions into one analysis table.
+4.  Clean timing issues, gaps, and missing values.
+5.  Create labels using a look-ahead prediction horizon.
+6.  Explore the data and verify class balance.
+7.  Engineer lag, rolling, and change-based features.
+8.  Move next into imbalance handling and model training.
+
+## Current status
+
+Implemented now:
+
+- Apple Silicon telemetry logger with structured raw-data output.
+- Session registry for tracking runs and metadata.
+- Stress runner for creating controlled workload sessions.
+- Modular preprocessing pipeline split into separate Python files.
+- Jupyter notebook for end-to-end experimentation and EDA.
+- Binary label construction using a forward prediction horizon.
+- Feature engineering with lags, rolling statistics, deltas, accelerations, and proxy features.
+
+Planned next:
+
+- Class imbalance handling, including class weights and possibly SMOTE or related resampling.
+- Model training and comparison using Logistic Regression, Random Forest, Gradient Boosting, and a Neural Network.
+- Proper evaluation with precision, recall, F1, PR curves, ROC curves, and threshold tuning.
+- Feature selection, calibration, and model packaging.
+
+## Repository structure
+
+``` text
+thermal-prediction/
+├── README.md
+├── LICENSE
+├── .gitignore
+├── requirements.txt
+├── code/
+│   ├── data_loader.py
+│   ├── data_quality.py
+│   ├── data_transform.py
+│   ├── data_labels.py
+│   ├── data_eda.py
+│   ├── data_features.py
+│   ├── data_prep.py
+│   ├── intermittent_stress_runner.py
+│   └── m_series_telemetry_logger_v3_sessionized.py
+├── notebooks/
+│   └── playground.ipynb
+├── data/
+│   ├── raw/
+│   └── interim/
+├── artifacts/
+└── docs/
+```
+
+### What each part does
+
+#### `code/m_series_telemetry_logger_v3_sessionized.py`
+
+Runs the macOS telemetry logger for Apple Silicon. It records structured samples at a chosen interval, writes each run to a raw session CSV, and updates a session registry.
+
+#### `code/intermittent_stress_runner.py`
+
+Creates intermittent stress/load patterns to generate more useful thermal behaviour in the dataset.
+
+#### `code/data_loader.py`
+
+Loads session files and merges them into one dataframe for downstream analysis.
+
+#### `code/data_quality.py`
+
+Handles time-order checks, trimming, and temporal gap management.
+
+#### `code/data_transform.py`
+
+Handles missing-value treatment, transformations, and target-distribution checks.
+
+#### `code/data_labels.py`
+
+Constructs the prediction target using a look-ahead window / prediction horizon.
+
+#### `code/data_eda.py`
+
+Contains exploratory plots, descriptive statistics, and signal/relationship inspection helpers.
+
+#### `code/data_features.py`
+
+Creates machine-learning features such as lags, rolling summaries, differences, accelerations, and engineered proxies.
+
+#### `code/data_prep.py`
+
+Holds reusable preparation logic and pipeline helpers used to keep the notebook cleaner.
+
+#### `notebooks/playground.ipynb`
+
+Main working notebook for running the end-to-end pipeline, validating outputs, and experimenting interactively.
+
+#### `data/raw/`
+
+Contains raw per-session CSV files produced by the logger.
+
+#### `data/interim/`
+
+Contains intermediate outputs such as the session registry and any cleaned or derived tabular files you choose to save.
+
+#### `artifacts/`
+
+Intended for saved models, scalers, encoders, plots, and other generated outputs.
+
+## Data layout and naming
+
+The telemetry logger is designed to save one CSV per session under a structured folder tree.
+
+Expected pattern:
+
+``` text
+data/raw/<machine_id>/<YYYY-MM-DD>/<machineid><yyyymmdd><run_number>.csv
+```
+
+There is also a session registry file, typically in:
+
+``` text
+data/interim/sessionregistry.csv
+```
+
+A typical session ID looks like:
+
+``` text
+macm520260627001
+```
+
+This convention makes it easier to track which machine produced which run, on which date, and in what order.
+
+## Environment setup
+
+## 1) Clone the repo
+
+``` bash
+git clone https://github.com/saifali03/thermal-prediction.git
+cd thermal-prediction
+```
+
+## 2) Create a Python environment
+
+Using `venv`:
+
+``` bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+On Windows PowerShell:
+
+``` powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+```
+
+Or using conda:
+
+``` bash
+conda create -n thermal-prediction python=3.11 -y
+conda activate thermal-prediction
+```
+
+## 3) Install dependencies
+
+``` bash
+pip install -r requirements.txt
+```
+
+## 4) Launch Jupyter
+
+``` bash
+jupyter notebook
+```
+
+Then open:
+
+``` text
+notebooks/playground.ipynb
+```
+
+## macOS telemetry collection
+
+This section is the most important for teammates who want to collect new Apple Silicon telemetry.
+
+### Requirements
+
+- An Apple Silicon Mac.
+- Python 3.11 or similar.
+- Permission to run commands with `sudo`.
+- `powermetrics` available on macOS.
+- Python packages from `requirements.txt`.
+
+### Why `sudo` is needed
+
+The logger relies on macOS `powermetrics` for core telemetry. On Apple Silicon, detailed power and thermal information is typically only available through privileged access, so the logger should be run with `sudo`.
+
+### Example logging command
+
+Run from the repository root:
+
+``` bash
+sudo python3 code/m_series_telemetry_logger_v3_sessionized.py \
+  --interval 5 \
+  --machine-id macm5 \
+  --base-dir data/raw \
+  --registry-path data/interim/sessionregistry.csv \
+  --notes "baseline or workload description here"
+```
+
+### What the command does
+
+- `--interval 5` logs a sample every 5 seconds.
+- `--machine-id macm5` tags the session with the machine identity.
+- `--base-dir data/raw` stores raw sessions inside the repo data folder.
+- `--registry-path data/interim/sessionregistry.csv` updates the shared registry.
+- `--notes` records useful session context for later analysis.
+
+### Suggested collection procedure
+
+To make the dataset useful, collect **different workload regimes**, not only one kind of session.
+
+Recommended session types:
+
+- Idle / near-idle.
+- Light browsing and office work.
+- Video playback.
+- Coding / notebook execution.
+- Sustained CPU-heavy work.
+- Intermittent stress sessions.
+- Real mixed-use sessions.
+
+For each run, write a short note describing:
+
+- what was running,
+- whether charger was connected,
+- room conditions if relevant,
+- whether background apps were open,
+- whether it was a deliberately stressed run.
+
+## Stress generation
+
+To intentionally create more varied thermal patterns, use the stress runner.
+
+Example:
+
+``` bash
+python3 code/intermittent_stress_runner.py
+```
+
+If your script accepts arguments, adapt as needed after checking the file help/options.
+
+Recommended workflow:
+
+1.  Start the logger.
+2.  Start the intermittent stress runner.
+3.  Let the machine cycle through work and rest periods.
+4.  Stop both and confirm the session file and registry entry were created.
+
+## Running the analysis pipeline
+
+The notebook is currently the easiest entry point for the full workflow.
+
+### Pipeline order
+
+The analysis flow is roughly:
+
+1.  Load and merge all session CSVs.
+2.  Trim edge rows and handle temporal gaps.
+3.  Handle missing values.
+4.  Construct labels using a thermal threshold and a look-ahead horizon.
+5.  Verify target distribution.
+6.  Run EDA.
+7.  Engineer features.
+8.  Drop invalid boundary rows created by lag/rolling features.
+9.  Proceed to modelling.
+
+### Typical notebook logic
+
+A representative sequence is:
+
+``` python
+from data_loader import *
+from data_quality import *
+from data_transform import *
+from data_labels import *
+from data_eda import *
+from data_features import *
+from data_prep import *
+
+DATADIR = "data/raw"
+
+rawdf = load_and_merge_sessions(DATADIR)
+dfnogaps = trim_and_handle_gaps(rawdf)
+dfimputed = handle_missing_values(dfnogaps)
+dffinal = construct_labels(dfimputed, temp_threshold_c=75.0)
+dffeatures = engineer_features(dffinal)
+dfmlready = drop_invalid_rows(dffeatures)
+```
+
+Note: function names may vary slightly depending on your latest local edits. Keep the README aligned with the current module API when pushing updates.
+
+## Label definition
+
+The current target is a **forward-looking binary label**.
+
+In simple terms:
+
+- a thermal event is identified when the monitored target crosses the defined threshold,
+- the rows within a fixed look-ahead horizon before that event are labelled positive,
+- the rest are labelled negative.
+
+This means the model is not learning to detect that the machine is already hot; it is learning to predict that a hot/distress state is coming soon.
+
+Current working setup in the notebook appears to use:
+
+- temperature threshold around `75.0 C`,
+- prediction horizon of `1.0 minute`,
+- 5-second sampling, which implies 12 future steps for the horizon.
+
+Adjust these values carefully, because they directly change the class balance and the meaning of the target.
+
+## Current dataset snapshot
+
+From the latest notebook state, the merged data appears to include multiple sessions and thousands of rows. A recent run in the notebook shows 5 merged sessions and 4,725 labelled rows after trimming and look-ahead handling, with class distribution approximately 83.05% class 0 and 16.95% class 1.
+
+That level of imbalance is moderate rather than extreme, which is why the next sensible phase is to compare weighting and resampling strategies before training the final classifiers.
+
+## Features engineered so far
+
+The current feature engineering appears to include:
+
+- lags for temperature, power, activity, and frequency signals,
+- rolling mean/std/max/min/range over windows such as 30s, 1m, 5m, and some longer summaries,
+- first differences and multi-step differences,
+- acceleration-style features,
+- proxy features such as thermal distress indicators and pressure/power interaction features.
+
+These are exactly the kinds of temporal summary features needed before trying baseline classifiers.
+
+## Next phase roadmap
+
+### 1) Class imbalance handling
+
+To test next:
+
+- no balancing baseline,
+- class weights,
+- random over/under-sampling,
+- SMOTE or related synthetic oversampling methods,
+- threshold moving after probability prediction.
+
+Because this is time-series-derived tabular data, be careful with leakage. Any balancing must be applied **inside the training fold only**, never before the train/validation split.
+
+### 2) Model training
+
+Planned models:
+
+- Logistic Regression,
+- Random Forest,
+- Gradient Boosting,
+- Neural Network.
+
+### 3) Evaluation
+
+Recommended metrics:
+
+- Precision,
+- Recall,
+- F1-score,
+- PR-AUC,
+- ROC-AUC,
+- confusion matrix,
+- lead-time usefulness for positives.
+
+Because the task is early-warning prediction, recall and precision around the positive class usually matter more than raw accuracy.
+
+## Important cautions
+
+### Data leakage
+
+Avoid leakage from the future into the past.
+
+- Split by session where appropriate.
+- Do not fit imputers/scalers on the full dataset before splitting.
+- Do not oversample before splitting.
+- Keep future-derived columns out of features.
+
+### Local paths
+
+Some current scripts/notebook cells may still contain absolute local paths. Before pushing, replace them with repository-relative paths such as `data/raw` and `data/interim/sessionregistry.csv`.
+
+## License
+
+This repository uses the MIT License.
+
+## Contact / usage note
+
+This repo is currently a live project workspace. Expect frequent iteration while the preprocessing, labelling, and modelling stages are still being refined.
